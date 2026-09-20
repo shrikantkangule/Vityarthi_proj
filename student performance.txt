@@ -1,0 +1,120 @@
+# Student Performance Prediction System
+# Built FROM SCRATCH - no sklearn, no external ML libraries.
+# We implement Logistic Regression ourselves using basic math.
+
+import math
+
+# ---------- STEP 1: Dataset ----------
+# Each row = [study_hours, attendance_percent, previous_score]
+X = [
+    [1, 60, 40], [2, 65, 45], [3, 70, 50], [4, 72, 55],
+    [5, 75, 60], [6, 80, 65], [7, 85, 70], [8, 88, 75],
+    [2, 55, 42], [3, 60, 48], [9, 90, 80], [10, 95, 85],
+    [1, 50, 35], [4, 68, 52], [6, 78, 62], [7, 82, 68],
+]
+
+# Result = 1 (Pass) or 0 (Fail)
+y = [0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1]
+
+
+# ---------- STEP 2: Normalize the data ----------
+# Study hours, attendance, and score are on very different scales
+# (e.g. 1-10 vs 0-100). We shrink everything to a 0-1 range so
+# the model learns fairly from all three.
+def normalize(data):
+    columns = list(zip(*data))          # group values column-wise
+    mins = [min(col) for col in columns]
+    maxs = [max(col) for col in columns]
+
+    normalized = []
+    for row in data:
+        new_row = []
+        for i in range(len(row)):
+            value = (row[i] - mins[i]) / (maxs[i] - mins[i])
+            new_row.append(value)
+        normalized.append(new_row)
+    return normalized, mins, maxs
+
+
+X_norm, mins, maxs = normalize(X)
+
+
+# ---------- STEP 3: Core math functions ----------
+def sigmoid(z):
+    # Converts any number into a value between 0 and 1 (a probability)
+    return 1 / (1 + math.exp(-z))
+
+
+def predict_probability(row, weights, bias):
+    # weighted sum of inputs + bias, passed through sigmoid
+    z = bias
+    for i in range(len(row)):
+        z += weights[i] * row[i]
+    return sigmoid(z)
+
+
+# ---------- STEP 4: Train using Gradient Descent ----------
+# Gradient descent slowly adjusts the weights to reduce prediction error.
+weights = [0.0, 0.0, 0.0]   # one weight per feature
+bias = 0.0
+learning_rate = 0.5
+epochs = 1000                # number of training rounds
+
+for epoch in range(epochs):
+    weight_gradients = [0.0, 0.0, 0.0]
+    bias_gradient = 0.0
+
+    for row, actual in zip(X_norm, y):
+        predicted = predict_probability(row, weights, bias)
+        error = predicted - actual
+
+        for i in range(len(row)):
+            weight_gradients[i] += error * row[i]
+        bias_gradient += error
+
+    n = len(X_norm)
+    for i in range(len(weights)):
+        weights[i] -= learning_rate * (weight_gradients[i] / n)
+    bias -= learning_rate * (bias_gradient / n)
+
+
+# ---------- STEP 5: Check accuracy on the training data ----------
+correct = 0
+for row, actual in zip(X_norm, y):
+    probability = predict_probability(row, weights, bias)
+    predicted_class = 1 if probability >= 0.5 else 0
+    if predicted_class == actual:
+        correct += 1
+
+accuracy = (correct / len(y)) * 100
+print("Model Accuracy:", round(accuracy, 2), "%")
+print("Learned weights:", [round(w, 3) for w in weights])
+print("Learned bias:", round(bias, 3))
+
+
+# ---------- STEP 6: Predict for a new student ----------
+def predict_new_student(study_hours, attendance, previous_score):
+    row = [study_hours, attendance, previous_score]
+    # normalize the new student using the same min/max as training data
+    norm_row = [(row[i] - mins[i]) / (maxs[i] - mins[i]) for i in range(len(row))]
+    probability = predict_probability(norm_row, weights, bias)
+    result = "PASS" if probability >= 0.5 else "FAIL"
+    return result, round(probability * 100, 2)
+
+
+# ---------- STEP 7: Ask the user for input ----------
+print("\n--- Predict a New Student's Performance ---")
+
+while True:
+    study_hours = float(input("Enter study hours: "))
+    attendance = float(input("Enter attendance percentage: "))
+    previous_score = float(input("Enter previous exam score: "))
+
+    result, confidence = predict_new_student(study_hours, attendance, previous_score)
+    print(f"\nPrediction: {result} (Confidence: {confidence}%)")
+
+    again = input("\nPredict another student? (y/n): ").strip().lower()
+    if again != "y":
+        print("Goodbye!")
+        break
+    print()
